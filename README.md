@@ -1,15 +1,16 @@
 # korero
+https://craiggunson.github.io/korero/
 
 Local chat app powered by Chrome's on-device Gemini Nano APIs.
 
 Setup
-```
-chrome://flags → Set everything nano to Enabled
-chrome://flags/#optimization-guide-on-device-model → Set to Enabled BypassPerfRequirement.
-chrome://components → After loading the page, wait for Optimization Guide On Device Model to download.  During this time the page should indicate Downloading, and eventually Ready. 
-```
 
-Live [demo](https://korero.craiggunson.com/)
+chrome://flags Set everything `nano` to `enabled`  
+chrome://flags/#optimization-guide-on-device-model Set to `Enabled BypassPerfRequirement`  
+chrome://components Wait for `Optimization Guide On Device Model` to download.  During this time the page should indicate Downloading, and eventually `Ready`   
+
+
+
 
 ## What it does
 

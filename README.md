@@ -5,7 +5,7 @@ Local chat app powered by Qwen3, running fully offline in your browser via WebLL
 
 ## Setup
 
-No installation needed — just open the page in a WebGPU-capable browser (recent Chrome or Edge; Firefox Nightly with `dom.webgpu.enabled` also works on supported hardware).
+No installation needed — just open the page in a WebGPU-capable browser Chrome or Firefox (with your GPU enabled).
 
 On first load the model weights (a few hundred MB) download and are cached by the browser, so subsequent visits work fully offline.
 
@@ -29,3 +29,5 @@ On first load the model weights (a few hundred MB) download and are cached by th
 4. Send messages in the chat panel.
 5. Use New Chat Session to reset model context.
 
+## Example
+![Alt Text](example.png)

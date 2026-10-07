@@ -30,8 +30,8 @@ On first load the model weights (a few hundred MB) download and are cached by th
 5. Use New Chat Session to reset model context.
 
 ## Safety
-Following the initial download you may turn off your WiFi, and run 100% offline.
-• 🔒 Absolute Data Privacy: Because the model runs offline, your prompts, passwords, personal data, or proprietary code never leave your machine. No external server or company can see or log your conversations.
+Following the initial download you may turn off your WiFi, and run 100% offline.  
+• 🔒 Absolute Data Privacy: Because the model runs offline, your prompts, passwords, personal data, or proprietary code never leave your machine. No external server or company can see or log your conversations.  
 • 🛠️ Browser Sandboxing: The model operates inside a secure browser thread. It does not have permission to look at your local hard drive, read your files, or execute malicious commands on your operating system.
 
 ## Example

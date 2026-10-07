@@ -1,34 +1,31 @@
 # korero
 https://craiggunson.github.io/korero/
 
-Local chat app powered by Chrome's on-device Gemini Nano APIs.
+Local chat app powered by Qwen3, running fully offline in your browser via WebLLM + WebGPU.
 
-Setup
+## Setup
 
-chrome://flags Set everything `nano` to `enabled`  
-chrome://flags/#optimization-guide-on-device-model Set to `Enabled BypassPerfRequirement`  
-chrome://components Wait for `Optimization Guide On Device Model` to download.  During this time the page should indicate Downloading, and eventually `Ready`   
+No installation needed — just open the page in a WebGPU-capable browser (recent Chrome or Edge; Firefox Nightly with `dom.webgpu.enabled` also works on supported hardware).
 
-
-
+On first load the model weights (a few hundred MB) download and are cached by the browser, so subsequent visits work fully offline.
 
 ## What it does
 
-- Runs a browser-based chat interface backed by the local Nano model
+- Runs a browser-based chat interface backed by a local Qwen3 model (no server, no API keys)
 - Supports multi-turn conversations in a persistent session
 - Lets you set system prompt, temperature, and top-k before starting a session
-- Keeps chats private by running on-device (when the model/API is available)
+- Keeps chats private by running entirely on-device
 
 ## Requirements
 
-- Chrome with built-in AI APIs available (Dev/Canary is usually the easiest path)
-- Gemini Nano model installed via chrome://components
-- Relevant flags enabled (for example prompt API flags)
+- A browser with WebGPU support (recent Chrome, Edge, or Firefox Nightly)
+- Enough memory/VRAM to hold the model weights and run inference locally
 
 ## Usage
 
 1. Open the page.
-2. Wait for the status badge to show readiness.
+2. Wait for the status badge to show the model has finished loading.
 3. Set your system prompt and generation settings.
 4. Send messages in the chat panel.
 5. Use New Chat Session to reset model context.
+

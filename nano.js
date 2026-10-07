@@ -1,3 +1,5 @@
+import { CreateMLCEngine } from "https://esm.run/@mlc-ai/web-llm";
+
 const badge = document.getElementById("statusBadge");
 const chatLog = document.getElementById("chatLog");
 const messageInput = document.getElementById("messageInput");
@@ -8,8 +10,11 @@ const sendBtn = document.getElementById("sendBtn");
 const clearBtn = document.getElementById("clearBtn");
 const newChatBtn = document.getElementById("newChatBtn");
 
-let chatApi = null;
-let session = null;
+// Small Qwen3 build so the weight download/caching stays practical for in-browser use.
+const MODEL_ID = "Qwen3-1.7B-q4f16_1-MLC";
+
+let engine = null;
+let history = [];
 let isBusy = false;
 
 function setStatus(text, level) {
@@ -23,6 +28,7 @@ function appendMessage(role, text) {
   node.textContent = text;
   chatLog.appendChild(node);
   chatLog.scrollTop = chatLog.scrollHeight;
+  return node;
 }
 
 function clearMessages() {
@@ -34,123 +40,92 @@ function setControlsEnabled(enabled) {
   newChatBtn.disabled = !enabled || isBusy;
 }
 
-function getChatAPI() {
-  if (typeof LanguageModel !== "undefined") return LanguageModel;
-  if (typeof self !== "undefined" && self.ai?.languageModel) return self.ai.languageModel;
-  if (typeof window !== "undefined" && window.ai?.languageModel) return window.ai.languageModel;
-  return null;
+function resetHistory() {
+  const systemPrompt = systemPromptInput.value.trim();
+  history = systemPrompt ? [{ role: "system", content: systemPrompt }] : [];
 }
 
-async function resolveAvailability(api) {
-  if (typeof api.availability === "function") {
-    return api.availability();
-  }
-  if (typeof api.capabilities === "function") {
-    const caps = await api.capabilities();
-    return caps.available;
-  }
-  return "available";
-}
-
-function getSessionOptions() {
+function getGenerationOptions() {
   const temp = Number(tempInput.value);
   const topK = Number(topKInput.value);
-
-  const options = {
-    systemPrompt: systemPromptInput.value.trim() || undefined,
-  };
-
+  const options = {};
   if (Number.isFinite(temp)) options.temperature = temp;
-  if (Number.isFinite(topK)) options.topK = topK;
-
+  if (Number.isFinite(topK)) options.top_k = topK;
   return options;
 }
 
-async function destroySessionIfNeeded() {
-  if (!session) return;
+async function initEngine() {
+  if (!navigator.gpu) {
+    setStatus("WebGPU not available", "err");
+    appendMessage(
+      "assistant",
+      "This browser does not support WebGPU, which is required to run Qwen locally.\n\n" +
+        "Try a recent version of Chrome, Edge, or Firefox Nightly."
+    );
+    setControlsEnabled(false);
+    return;
+  }
 
   try {
-    if (typeof session.destroy === "function") {
-      session.destroy();
-    }
-  } catch (err) {
-    console.warn("Session destroy failed:", err);
-  } finally {
-    session = null;
-  }
-}
+    engine = await CreateMLCEngine(MODEL_ID, {
+      initProgressCallback: (progress) => {
+        setStatus(progress.text || "Loading model…", "warn");
+      },
+    });
 
-async function createSessionIfNeeded(forceNew = false) {
-  if (!chatApi) {
-    throw new Error("Nano chat API is not available in this browser instance.");
-  }
-
-  if (session && !forceNew) return session;
-  await destroySessionIfNeeded();
-  session = await chatApi.create(getSessionOptions());
-  return session;
-}
-
-async function checkAvailability() {
-  console.log("typeof LanguageModel:", typeof LanguageModel);
-  console.log("self.ai:", typeof self !== "undefined" ? self.ai : "N/A");
-  console.log("window.ai:", typeof window !== "undefined" ? window.ai : "N/A");
-
-  chatApi = getChatAPI();
-  if (!chatApi) {
-    setStatus("Nano Chat API not found", "err");
-    appendMessage(
-      "assistant",
-      "No LanguageModel API was detected.\n\n" +
-        "Try Chrome Dev/Canary with AI flags enabled, then restart the browser."
-    );
-    setControlsEnabled(false);
-    return;
-  }
-
-  const status = await resolveAvailability(chatApi);
-  const unavailable = ["no", "unavailable"];
-  const downloading = ["after-download", "downloadable", "downloading"];
-
-  if (unavailable.includes(status)) {
-    setStatus("Model unavailable", "warn");
-    appendMessage(
-      "assistant",
-      "The API exists but the on-device model is unavailable.\n" +
-        "Open chrome://components and update 'Optimization Guide On Device Model', then restart Chrome."
-    );
-    setControlsEnabled(false);
-    return;
-  }
-
-  if (downloading.includes(status)) {
-    setStatus("Model downloading…", "warn");
-    appendMessage("assistant", "The model is still downloading. You can try again in a few minutes.");
+    resetHistory();
+    setStatus("Ready for chat", "");
     setControlsEnabled(true);
-    return;
-  }
+    appendMessage("assistant", "Qwen is loaded and running fully offline in your browser. Send your first message.");
+  } catch (err) {
+    console.error("Engine init error:", err);
+    setStatus("Model load failed", "err");
 
-  setStatus("Ready for chat", "");
-  setControlsEnabled(true);
-  appendMessage("assistant", "Chat session is ready. Send your first message.");
+    const message = err?.message || String(err);
+    if (message.includes("maxStorageBuffersPerShaderStage")) {
+      appendMessage(
+        "assistant",
+        "Your browser's WebGPU implementation doesn't yet support enough storage buffers per shader for this model.\n\n" +
+          "This is a known current limitation in Firefox's WebGPU backend (vs. Chrome/Edge). Try Chrome, Edge, or Firefox Nightly with dom.webgpu.enabled."
+      );
+    } else {
+      appendMessage("assistant", "Error loading the model: " + message);
+    }
+    setControlsEnabled(false);
+  }
 }
 
 async function sendMessage() {
   const text = messageInput.value.trim();
-  if (!text || isBusy) return;
+  if (!text || isBusy || !engine) return;
 
   isBusy = true;
   setControlsEnabled(true);
   appendMessage("user", text);
   messageInput.value = "";
 
+  history.push({ role: "user", content: text });
+  const assistantNode = appendMessage("assistant", "");
+
   try {
-    const activeSession = await createSessionIfNeeded(false);
-    const response = await activeSession.prompt(text);
-    appendMessage("assistant", response);
+    const stream = await engine.chat.completions.create({
+      messages: history,
+      stream: true,
+      ...getGenerationOptions(),
+    });
+
+    let reply = "";
+    for await (const chunk of stream) {
+      const delta = chunk.choices?.[0]?.delta?.content || "";
+      reply += delta;
+      assistantNode.textContent = reply;
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    history.push({ role: "assistant", content: reply });
   } catch (err) {
     console.error("Chat error:", err);
-    appendMessage("assistant", "Error: " + (err?.message || String(err)));
+    assistantNode.textContent = "Error: " + (err?.message || String(err));
   } finally {
     isBusy = false;
     setControlsEnabled(true);
@@ -173,12 +148,13 @@ clearBtn.addEventListener("click", () => {
 });
 
 newChatBtn.addEventListener("click", async () => {
-  if (isBusy) return;
+  if (isBusy || !engine) return;
 
   isBusy = true;
   setControlsEnabled(true);
   try {
-    await createSessionIfNeeded(true);
+    await engine.resetChat();
+    resetHistory();
     clearMessages();
     appendMessage("assistant", "Started a fresh chat session with your current settings.");
   } catch (err) {
@@ -190,4 +166,4 @@ newChatBtn.addEventListener("click", async () => {
   }
 });
 
-checkAvailability();
+initEngine();
